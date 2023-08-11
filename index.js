@@ -57,7 +57,7 @@ var application = express();
 application.use(bodyParser.json()); // Accept JSON params
 application.use(bodyParser.urlencoded({extended: true})); // Accept URL encoded params
 
-application.post('/register', (req,res,next)=>{
+application.post('/register/', (req,res,next)=>{
     console.log(req.body);
     var post_data = req.body; // Get POST params
     var uid = uuid.v4(); 
@@ -82,9 +82,21 @@ application.post('/register', (req,res,next)=>{
         });
         
         if(result && result.length) {
-            res.json('User already exists.');
+            res.json('This email address is in use.');
         }
         else {
+
+            connection.query('SELECT * FROM users WHERE cnic=?',[cnic],function(err,result,fields) {
+                connection.on('error',function(err) {
+                    console.log('[MYSQL ERROR]',err);
+                });
+                
+                if(result && result.length) {
+                    res.json('This cnic is in use.');
+                }
+            });
+
+
             connection.query('INSERT INTO pawfection.users(fullName, emailAddress, cnic, accountType, password) VALUES (?,?,?,?,?)',
             [fullName, emailAddress, cnic, accountType, password], function(err, result, fields) {
                 connection.on('error',function(err) {
@@ -97,13 +109,14 @@ application.post('/register', (req,res,next)=>{
     });
 })
 
-/*application.post('/login/',(req,res,next)=>{
+application.post('/login/',(req,res,next)=>{
     var post_data = req.body;
+    console.log(req.body);
     var user_password = post_data.password;
     var emailAddress = post_data.emailAddress;
     var firstName = post_data.firstName;
 
-    connection.query('SELECT * FROM users WHERE firstName=?',[firstName],function(err,result,fields) {
+    connection.query('SELECT * FROM users WHERE emailAddress=?',[emailAddress],function(err,result,fields) {
         connection.on('error',function(err) {
             console.log('[MYSQL ERROR]',err);
         });
@@ -111,8 +124,8 @@ application.post('/register', (req,res,next)=>{
         if(result && result.length) {
             var salt = result[0].salt;
             var password = result[0].password;
-            var hashed_password = checkHashPassword(user_password, salt).passwordHash;
-            if(password == hashed_password) {
+            //var hashed_password = checkHashPassword(user_password, salt).passwordHash;
+            if(password == user_password) {
                 res.end(JSON.stringify(result[0]))
             }
             else {
@@ -126,7 +139,35 @@ application.post('/register', (req,res,next)=>{
 
    
 
-})*/
+})
+
+application.post('/create-new-alert/',(req,res,next)=>{
+    var post_data = req.body;
+    var petName = post_data.petName;
+    var lastSeen = post_data.lastSeen;
+    var contactNumber = post_data.contactNumber;
+    var users_id = post_data.users_id;
+
+    connection.query('INSERT INTO pawfection.lostpetalerts(petName, lastSeen, contactNumber, users_id) VALUES (?,?,?,?)',
+            [petName, lastSeen, contactNumber, users_id], function(err, result, fields) {
+                connection.on('error',function(err) {
+                    console.log('[MYSQL ERROR]',err);
+                    res.json('Alert not created. Error: ',err);
+                });
+                res.json('Alert created.');
+            });
+
+})
+
+application.get('/get-alerts/',(req,res)=>{
+    connection.query('SELECT * FROM pawfection.lostpetalerts', function(err, result, fields) {
+        connection.on('error',function(err) {
+            console.log('[MYSQL ERROR]',err);
+            res.status(500).json({ error: 'Alerts not received. Error: ' + err });
+        });
+        res.json(result);
+    });
+});
 
 /*application.get("/", (req,res,next) => {
     console.log('Password: 123456');
